@@ -1,0 +1,23 @@
+{
+  "name": "codex-reset-status-linux-x64",
+  "version": "0.1.0",
+  "description": "Native codex-reset-status binary for Linux x64",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pavelbe/codex-reset-status.git",
+    "directory": "npm/codex-reset-status-linux-x64"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/codex-reset-status",
+    "build-receipt.json",
+    "LICENSE",
+    "NOTICE"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "available_count": 2,
+  "total_earned_count": 3,
+  "account_email": "must-not-appear@example.com",
+  "credits": [
+    {
+      "status": "available",
+      "reset_type": "codex_rate_limits",
+      "expires_at": "2030-07-31T20:18:56.594388Z",
+      "access_token": "must-not-appear"
+    },
+    {
+      "status": "available",
+      "reset_type": "codex_rate_limits",
+      "expires_at": 1911243150
+    }
+  ]
+}

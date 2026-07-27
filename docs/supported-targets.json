@@ -1,0 +1,46 @@
+{
+  "schema": "codex-reset-status-targets/v1",
+  "targets": [
+    {
+      "rustTriple": "x86_64-unknown-linux-gnu",
+      "npmPlatform": "linux-x64",
+      "status": "supported-locally",
+      "evidence": [
+        "cargo test --locked",
+        "cargo build --release --locked",
+        "relocated archive smoke",
+        "local npm tarball smoke"
+      ]
+    },
+    {
+      "rustTriple": "x86_64-unknown-linux-musl",
+      "npmPlatform": "linux-x64",
+      "status": "not-built",
+      "evidence": []
+    },
+    {
+      "rustTriple": "aarch64-unknown-linux-gnu",
+      "npmPlatform": "linux-arm64",
+      "status": "not-built",
+      "evidence": []
+    },
+    {
+      "rustTriple": "x86_64-apple-darwin",
+      "npmPlatform": "darwin-x64",
+      "status": "not-built",
+      "evidence": []
+    },
+    {
+      "rustTriple": "aarch64-apple-darwin",
+      "npmPlatform": "darwin-arm64",
+      "status": "not-built",
+      "evidence": []
+    },
+    {
+      "rustTriple": "x86_64-pc-windows-msvc",
+      "npmPlatform": "win32-x64",
+      "status": "not-built",
+      "evidence": []
+    }
+  ]
+}

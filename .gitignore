@@ -1,0 +1,5 @@
+/target/
+/dist/
+/node_modules/
+*.tgz
+npm/codex-reset-status-linux-x64/bin/codex-reset-status

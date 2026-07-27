@@ -1,0 +1,27 @@
+{
+  "name": "codex-reset-status",
+  "version": "0.1.0",
+  "description": "Show when local ChatGPT/Codex reset credits expire",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pavelbe/codex-reset-status.git",
+    "directory": "npm/codex-reset-status"
+  },
+  "bin": {
+    "codex-reset-status": "bin/cli.js"
+  },
+  "files": [
+    "bin/cli.js",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "optionalDependencies": {
+    "codex-reset-status-linux-x64": "0.1.0"
+  }
+}
