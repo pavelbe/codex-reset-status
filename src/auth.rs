@@ -85,9 +85,41 @@ pub fn read(path: &Path) -> Result<Auth, CliError> {
         })
         .filter(|value| !value.is_empty())
         .map(str::to_owned);
+    if account_id
+        .as_deref()
+        .is_some_and(|value| !is_header_safe(value))
+    {
+        return Err(CliError::new(
+            ErrorKind::Auth,
+            "auth file has an invalid account_id; expected visible ASCII characters",
+        ));
+    }
 
     Ok(Auth {
         token: Secret::new(token.to_owned()),
         account_id,
     })
+}
+
+/// Accepts only visible ASCII, so a stored account id cannot inject a header
+/// line or terminal control sequence.
+fn is_header_safe(value: &str) -> bool {
+    value.len() <= 128
+        && value
+            .chars()
+            .all(|character| character.is_ascii_graphic() || character == ' ')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_header_safe;
+
+    #[test]
+    fn rejects_header_unsafe_account_ids() {
+        assert!(is_header_safe("acc_1234-abcd"));
+        assert!(!is_header_safe("acc\r\nX-Injected: 1"));
+        assert!(!is_header_safe("acc\u{1b}[31m"));
+        assert!(!is_header_safe("acc\u{00e9}"));
+        assert!(!is_header_safe(&"a".repeat(129)));
+    }
 }

@@ -1,33 +1,78 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { chmodSync, realpathSync, statSync } from 'node:fs';
+import { realpathSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
+const HOMEPAGE = 'https://github.com/pavelbe/codex-reset-status';
 
-function packageName(platform = process.platform, arch = process.arch) {
-  if (platform === 'linux' && arch === 'x64') {
+/**
+ * The shipped binary links against glibc, so a musl host is unsupported even
+ * though its platform and architecture match. An unknown libc is not blocked.
+ */
+function detectLibc(platform = process.platform, report = process.report) {
+  if (platform !== 'linux') {
+    return undefined;
+  }
+  const header = typeof report?.getReport === 'function' ? report.getReport().header : undefined;
+  if (header == null) {
+    return undefined;
+  }
+  return header.glibcVersionRuntime == null ? 'musl' : 'glibc';
+}
+
+function packageName(platform = process.platform, arch = process.arch, libc = detectLibc(platform)) {
+  if (platform === 'linux' && arch === 'x64' && libc !== 'musl') {
     return 'codex-reset-status-linux-x64';
   }
   return undefined;
 }
 
+/**
+ * Distinguishes three failures that need different fixes: a platform this
+ * version never ships, a musl host, and a missing optional native package.
+ */
 function resolveBinary({
   platform = process.platform,
   arch = process.arch,
+  libc = detectLibc(platform),
   resolve = (id) => require.resolve(id),
 } = {}) {
-  const nativePackage = packageName(platform, arch);
+  const nativePackage = packageName(platform, arch, libc);
   if (nativePackage == null) {
-    return undefined;
+    const reason =
+      platform === 'linux' && arch === 'x64' && libc === 'musl'
+        ? 'unsupported-libc'
+        : 'unsupported-platform';
+    return { binaryPath: undefined, reason };
   }
   try {
-    return resolve(`${nativePackage}/bin/codex-reset-status`);
+    return { binaryPath: resolve(`${nativePackage}/bin/codex-reset-status`), reason: undefined };
   } catch {
-    return undefined;
+    return { binaryPath: undefined, reason: 'missing-native-package', nativePackage };
   }
+}
+
+function unavailableMessage(resolution, platform = process.platform, arch = process.arch) {
+  if (resolution.reason === 'unsupported-libc') {
+    return (
+      `codex-reset-status ships a glibc binary, but this host uses musl (${platform}-${arch}). ` +
+      `Build from source at ${HOMEPAGE}\n`
+    );
+  }
+  if (resolution.reason === 'unsupported-platform') {
+    return (
+      `codex-reset-status has no native binary for ${platform}-${arch}. ` +
+      `This version supports linux-x64 with glibc only; build from source at ${HOMEPAGE}\n`
+    );
+  }
+  return (
+    `codex-reset-status could not load its native package ${resolution.nativePackage} for ` +
+    `${platform}-${arch}. Reinstall codex-reset-status so the optional dependency is installed, ` +
+    'and do not install with --no-optional or --omit=optional.\n'
+  );
 }
 
 function isMain({ entry = process.argv[1], moduleUrl = import.meta.url } = {}) {
@@ -42,30 +87,32 @@ function isMain({ entry = process.argv[1], moduleUrl = import.meta.url } = {}) {
   }
 }
 
-function ensureExecutable(binaryPath, platform = process.platform) {
-  if (platform === 'win32') {
-    return;
-  }
-  const mode = statSync(binaryPath).mode;
+/**
+ * Reports a lost executable bit instead of repairing it: a runtime chmod would
+ * mutate a shared package store and hide a broken published tarball.
+ */
+function checkExecutable(binaryPath, stat = statSync) {
+  const mode = stat(binaryPath).mode;
   if ((mode & 0o111) === 0) {
-    chmodSync(binaryPath, 0o755);
+    throw new Error(
+      `${binaryPath} is not executable (mode ${(mode & 0o777).toString(8)}). ` +
+        'Reinstall codex-reset-status; do not chmod inside node_modules.',
+    );
   }
 }
 
 async function run(argv, spawnNative = spawn) {
-  const binaryPath = resolveBinary();
+  const resolution = resolveBinary();
+  const binaryPath = resolution.binaryPath;
   if (binaryPath == null) {
-    process.stderr.write(
-      `codex-reset-status native binary is not available for ${process.platform}-${process.arch}. ` +
-        'Reinstall the package so optional native dependencies are installed.\n',
-    );
+    process.stderr.write(unavailableMessage(resolution));
     return 1;
   }
 
   try {
-    ensureExecutable(binaryPath);
+    checkExecutable(binaryPath);
   } catch (error) {
-    process.stderr.write(`codex-reset-status native binary is not executable: ${error.message}\n`);
+    process.stderr.write(`codex-reset-status: ${error.message}\n`);
     return 1;
   }
 
@@ -110,4 +157,4 @@ if (isMain()) {
   process.exitCode = await run(process.argv.slice(2));
 }
 
-export { ensureExecutable, isMain, packageName, resolveBinary, run };
+export { checkExecutable, detectLibc, isMain, packageName, resolveBinary, run, unavailableMessage };

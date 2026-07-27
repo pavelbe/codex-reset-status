@@ -1,34 +1,67 @@
 # codex-reset-status
 
-`codex-reset-status` shows available ChatGPT/Codex reset credits and when each
-credit expires.
+`codex-reset-status` shows how many ChatGPT/Codex usage-limit reset credits you
+have and when each one expires — from the terminal, without opening the ChatGPT
+settings panel.
 
-The CLI is read-only. It reads the existing Codex authentication file, makes
-one request, and prints an allowlisted summary. It never prints the access
-token or passes it to a subprocess.
+```text
+Codex Reset Credits
+Available: 2 resets
+Total earned: 3
+Checked: 2026-07-28 00:11 MSK
+
+#  Status     Type               Expires (local)       Time left
+-  ---------  -----------------  --------------------  ---------
+1  available  codex_rate_limits  2026-07-31 23:18 MSK  3d 23h
+2  available  codex_rate_limits  2026-08-12 21:12 MSK  15d 21h
+```
+
+This is the same information the ChatGPT interface shows under **Usage limit
+resets**:
+
+![ChatGPT UI panel listing two available full resets expiring 7/31 and 8/12](https://raw.githubusercontent.com/pavelbe/codex-reset-status/main/docs/assets/chatgpt-usage-limit-resets.png)
+
+The CLI is read-only. It reads the existing Codex authentication file, makes one
+request, and prints an allowlisted summary. It never prints the access token or
+passes it to a subprocess.
 
 > This is an independent, unofficial project. It is not affiliated with or
 > endorsed by OpenAI. It uses an undocumented ChatGPT backend endpoint that can
-> change or disappear without notice.
+> change or disappear without notice. The screenshot above is a screenshot of
+> the ChatGPT interface, included only to identify which data this tool reads.
 
-## Current Status
+## Install
 
-Version `0.1.0` is in development. Linux x86_64 and WSL are the only locally
-verified targets. npm and crates.io packages are not published yet.
-
-The complete Rust source is public under the MIT license. Future npm packages
-may contain a small launcher and compiled platform binary without duplicating
-the Rust source already available in this repository.
-
-## Build
+Once the packages are published, the launcher installs the prebuilt binary
+through `optionalDependencies` — no install scripts and no runtime downloads:
 
 ```bash
+npm install -g codex-reset-status
+codex-reset-status
+```
+
+Or build from source (always available, MIT):
+
+```bash
+git clone https://github.com/pavelbe/codex-reset-status.git
+cd codex-reset-status
 cargo build --release --locked
 ./target/release/codex-reset-status
 ```
 
 By default the CLI reads `$CODEX_HOME/auth.json`, falling back to
-`~/.codex/auth.json`.
+`~/.codex/auth.json`. Sign in with the Codex CLI first, so that file exists.
+
+## Current Status
+
+Version `0.1.0` is in development. Linux x86_64 with glibc (including WSL) is the
+only locally verified target; the binary requires `GLIBC_2.34` or newer and musl
+hosts are reported as unsupported.
+npm and crates.io packages are not published yet.
+
+The complete Rust source is public under the MIT license. The npm packages
+contain a small launcher and the compiled platform binary; they do not duplicate
+or hide the Rust source in this repository.
 
 ## Usage
 
@@ -37,6 +70,7 @@ codex-reset-status
 codex-reset-status --json
 codex-reset-status --auth-file ~/.codex/auth.json
 codex-reset-status --fixture tests/fixtures/ok.json
+codex-reset-status --timeout 15
 ```
 
 `--fixture` performs no network request and is intended for deterministic
@@ -48,30 +82,48 @@ For compatibility with the current endpoint, the request sends the
 built-in ChatGPT URL or an explicitly opted-in loopback test, so a command
 cannot redirect the access token to an arbitrary host.
 
-## Output
+Exit codes: `0` success, `2` usage, `3` auth file, `4` transport, `5` rejected
+authentication, `6` unexpected response.
 
-```text
-Codex Reset Credits
-Available: 2 resets
-Checked: 2026-07-27 18:46 MSK
+### JSON output
 
-#  Status     Type               Expires (local)       Time left
--  ---------  -----------------  --------------------  ---------
-1  available  codex_rate_limits  2026-07-31 23:18 MSK  4d 4h
-2  available  codex_rate_limits  2026-08-12 21:12 MSK  16d 2h
+```bash
+codex-reset-status --json
 ```
 
 Machine-readable output uses the versioned allowlist schema
-`codex-reset-status/v1`; it never returns the raw endpoint response.
+`codex-reset-status/v1` with `tool`, `source`, `checkedAt`, `availableCount`,
+`totalEarnedCount`, `credits[]` and `warnings[]`. It never returns the raw
+endpoint response, so an added upstream field cannot leak into your logs.
+
+## How it works
+
+A single Rust binary: HTTPS, auth parsing, response parsing and rendering all
+run in-process. One request, no redirects, no retries, a bounded response size,
+and terminal control characters stripped from remote strings. See
+[docs/architecture.md](docs/architecture.md).
 
 ## Local Gates
 
 ```bash
-make check
-make package-local
+make check           # tests, fmt, clippy, release build, guards, launcher tests
+make package-local   # archive + npm tarballs + content/resolution smokes
+make package-release # same, but refuses an unborn HEAD or a dirty tree
 ```
 
+`make package-local` verifies the exact archive/tarball contents (file set,
+modes, no symlinks or traversal), the embedded build receipt, and installs the
+launcher alone against a disposable local registry to prove
+`optionalDependencies` resolution. Release provenance and its limits are
+documented in [docs/provenance.md](docs/provenance.md); verified targets in
+[docs/supported-targets.json](docs/supported-targets.json).
+
 All checks and release packaging are local. This project does not use GitHub Actions.
+
+## Contributing
+
+Issues and pull requests are welcome. Run `make check` before opening a pull
+request, and see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security
 

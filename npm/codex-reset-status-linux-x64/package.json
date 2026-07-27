@@ -1,7 +1,7 @@
 {
   "name": "codex-reset-status-linux-x64",
   "version": "0.1.0",
-  "description": "Native codex-reset-status binary for Linux x64",
+  "description": "Native codex-reset-status binary for Linux x64 (glibc)",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +13,9 @@
   ],
   "cpu": [
     "x64"
+  ],
+  "libc": [
+    "glibc"
   ],
   "files": [
     "bin/codex-reset-status",

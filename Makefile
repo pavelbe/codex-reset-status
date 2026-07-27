@@ -2,7 +2,7 @@ CARGO ?= $(if $(wildcard $(HOME)/.cargo/bin/cargo),$(HOME)/.cargo/bin/cargo,carg
 # Optional local wrapper. Example: HEAVY_LOCK=~/.claude/bin/heavy-lock.sh
 HEAVY_LOCK ?=
 
-.PHONY: check test fmt clippy build package-local clean
+.PHONY: check test fmt clippy build package-local package-release clean
 
 define run_heavy
 	@if [ -n "$(HEAVY_LOCK)" ] && [ -x "$(HEAVY_LOCK)" ]; then \
@@ -27,10 +27,15 @@ build:
 check: test fmt clippy build
 	bash scripts/check-no-subprocess.sh
 	bash scripts/check-public-claims.sh
+	node scripts/check-version-parity.mjs --binary target/release/codex-reset-status
 	$(call run_heavy,node --test npm/codex-reset-status/test/cli.test.mjs)
 
 package-local:
 	$(call run_heavy,env CARGO="$(CARGO)" bash scripts/package-release.sh --output-dir dist)
+
+# Release packaging that refuses an unborn HEAD or a dirty tree.
+package-release:
+	$(call run_heavy,env CARGO="$(CARGO)" bash scripts/package-release.sh --output-dir dist --require-clean)
 
 clean:
 	$(CARGO) clean

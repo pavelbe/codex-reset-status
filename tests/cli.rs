@@ -13,6 +13,60 @@ fn fixture(name: &str) -> String {
     format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
+fn write_temp_auth(token: &str, account_id: &str) -> std::path::PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "codex-reset-status-auth-{}-{unique}.json",
+        std::process::id()
+    ));
+    fs::write(
+        &path,
+        format!(r#"{{"tokens":{{"access_token":"{token}","account_id":"{account_id}"}}}}"#),
+    )
+    .unwrap();
+    path
+}
+
+/// Serves one HTTP response and returns the raw request bytes it received.
+fn serve_once(
+    listener: TcpListener,
+    status_line: &'static str,
+    body: String,
+) -> thread::JoinHandle<String> {
+    thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut request = [0_u8; 8192];
+        let size = stream.read(&mut request).unwrap();
+        let _ = write!(
+            stream,
+            "{status_line}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let _ = stream.flush();
+        String::from_utf8_lossy(&request[..size]).into_owned()
+    })
+}
+
+/// Points every proxy variable at a closed port so a request that honors the
+/// environment proxy cannot succeed.
+fn with_dead_proxy(command: &mut Command) -> &mut Command {
+    for variable in [
+        "HTTPS_PROXY",
+        "https_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+    ] {
+        command.env(variable, "http://127.0.0.1:1");
+    }
+    command.env_remove("NO_PROXY").env_remove("no_proxy")
+}
+
 #[test]
 fn renders_allowlisted_json() {
     let output = Command::new(binary())
@@ -83,35 +137,12 @@ fn redacts_a_token_echoed_by_an_unauthorized_server() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let endpoint = format!("http://{}", listener.local_addr().unwrap());
     let token = "test-token-that-must-not-leak";
-    let server_token = token.to_owned();
-    let server = thread::spawn(move || {
-        let (mut stream, _) = listener.accept().unwrap();
-        let mut request = [0_u8; 8192];
-        let size = stream.read(&mut request).unwrap();
-        assert!(String::from_utf8_lossy(&request[..size]).contains(&server_token));
-        let body = format!("echo: {server_token}");
-        write!(
-            stream,
-            "HTTP/1.1 401 Unauthorized\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-            body.len(),
-            body
-        )
-        .unwrap();
-    });
-
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let auth_path = std::env::temp_dir().join(format!(
-        "codex-reset-status-auth-{}-{unique}.json",
-        std::process::id()
-    ));
-    fs::write(
-        &auth_path,
-        format!(r#"{{"tokens":{{"access_token":"{token}","account_id":"test"}}}}"#),
-    )
-    .unwrap();
+    let server = serve_once(
+        listener,
+        "HTTP/1.1 401 Unauthorized",
+        format!("echo: {token}"),
+    );
+    let auth_path = write_temp_auth(token, "test");
 
     let output = Command::new(binary())
         .args([
@@ -130,10 +161,126 @@ fn redacts_a_token_echoed_by_an_unauthorized_server() {
         .output()
         .expect("run binary");
 
-    server.join().unwrap();
+    let request = server.join().unwrap();
     fs::remove_file(auth_path).unwrap();
+    assert!(
+        request.contains(token),
+        "server must observe the bearer token"
+    );
     assert_eq!(output.status.code(), Some(5));
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(!stderr.contains(token));
     assert!(stderr.contains("HTTP 401"));
+}
+
+#[test]
+fn bypasses_the_environment_proxy_for_a_loopback_endpoint() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let server = serve_once(
+        listener,
+        "HTTP/1.1 200 OK",
+        r#"{"available_count":0,"credits":[]}"#.to_owned(),
+    );
+    let auth_path = write_temp_auth("proxy-bypass-token", "test");
+
+    let mut command = Command::new(binary());
+    command
+        .args([
+            "--auth-file",
+            auth_path.to_str().unwrap(),
+            "--endpoint",
+            &endpoint,
+            "--timeout",
+            "5",
+        ])
+        .env("CODEX_RESET_STATUS_ALLOW_INSECURE_LOOPBACK", "1");
+    let output = with_dead_proxy(&mut command).output().expect("run binary");
+
+    let request = server.join().unwrap();
+    fs::remove_file(auth_path).unwrap();
+    assert!(
+        request.starts_with("GET /"),
+        "loopback request must reach the listener directly, got: {request}"
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("No reset credits found.")
+    );
+}
+
+#[test]
+fn rejects_a_response_larger_than_the_body_cap() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let padding = "x".repeat(1024 * 1024 + 64);
+    let server = serve_once(
+        listener,
+        "HTTP/1.1 200 OK",
+        format!(r#"{{"credits":[],"padding":"{padding}"}}"#),
+    );
+    let auth_path = write_temp_auth("cap-token", "test");
+
+    let mut command = Command::new(binary());
+    command
+        .args([
+            "--auth-file",
+            auth_path.to_str().unwrap(),
+            "--endpoint",
+            &endpoint,
+            "--timeout",
+            "15",
+        ])
+        .env("CODEX_RESET_STATUS_ALLOW_INSECURE_LOOPBACK", "1");
+    let output = with_dead_proxy(&mut command).output().expect("run binary");
+
+    let _ = server.join();
+    fs::remove_file(auth_path).unwrap();
+    assert_eq!(output.status.code(), Some(6));
+    // The bounded reader refuses the oversized body; the explicit length check in
+    // http.rs stays as a second line of defence, so accept either message.
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("larger than request limit: 1048577") || stderr.contains("1048576 bytes"),
+        "expected a body cap error, got: {stderr}"
+    );
+}
+
+#[test]
+fn rejects_a_control_character_account_id_before_any_request() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let auth_path = write_temp_auth("header-token", r"test\r\nX-Injected: 1");
+
+    let output = Command::new(binary())
+        .args([
+            "--auth-file",
+            auth_path.to_str().unwrap(),
+            "--endpoint",
+            &endpoint,
+            "--timeout",
+            "5",
+        ])
+        .env("CODEX_RESET_STATUS_ALLOW_INSECURE_LOOPBACK", "1")
+        .output()
+        .expect("run binary");
+
+    fs::remove_file(auth_path).unwrap();
+    assert_eq!(output.status.code(), Some(3));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("account_id"), "stderr: {stderr}");
+    listener
+        .set_nonblocking(true)
+        .expect("listener must stay usable");
+    assert!(
+        listener.accept().is_err(),
+        "no request may be sent when the account id is rejected"
+    );
 }

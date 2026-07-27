@@ -4,12 +4,16 @@
     {
       "rustTriple": "x86_64-unknown-linux-gnu",
       "npmPlatform": "linux-x64",
+      "libc": "glibc",
+      "minimumGlibc": "2.34",
       "status": "supported-locally",
       "evidence": [
         "cargo test --locked",
         "cargo build --release --locked",
         "relocated archive smoke",
-        "local npm tarball smoke"
+        "local npm tarball smoke",
+        "launcher-only optionalDependencies resolution against a fixture registry",
+        "objdump -T highest required symbol version: GLIBC_2.34"
       ]
     },
     {

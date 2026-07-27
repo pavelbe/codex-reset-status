@@ -13,14 +13,20 @@ if [[ -z "${RUSTC:-}" ]]; then
 fi
 OUTPUT_DIR="$ROOT/dist"
 
+REQUIRE_CLEAN=0
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --output-dir)
             OUTPUT_DIR="${2:?--output-dir requires a path}"
             shift 2
             ;;
+        --require-clean)
+            REQUIRE_CLEAN=1
+            shift
+            ;;
         -h|--help)
-            echo "Usage: scripts/package-release.sh [--output-dir DIR]"
+            echo "Usage: scripts/package-release.sh [--output-dir DIR] [--require-clean]"
             exit 0
             ;;
         *)
@@ -37,7 +43,14 @@ for command in "$CARGO" "$RUSTC" git jq npm node sha256sum tar; do
     fi
 done
 
-version="$(node -p "require('$ROOT/npm/codex-reset-status/package.json').version")"
+# Cargo.toml is the single version source of truth; parity is asserted before
+# anything is built or packed.
+node "$ROOT/scripts/check-version-parity.mjs"
+version="$(sed -n '/^\[package\]/,/^\[/{s/^version *= *"\([^"]*\)".*/\1/p}' "$ROOT/Cargo.toml" | head -1)"
+if [[ -z "$version" ]]; then
+    echo "ERROR: cannot read the version from Cargo.toml" >&2
+    exit 1
+fi
 target="$("$CARGO" -vV | sed -n 's/^host: //p')"
 if [[ "$target" != "x86_64-unknown-linux-gnu" ]]; then
     echo "ERROR: local v0.1 packaging supports only x86_64-unknown-linux-gnu, got $target" >&2
@@ -51,6 +64,7 @@ if [[ ! -x "$binary" ]]; then
     echo "ERROR: release binary was not built: $binary" >&2
     exit 1
 fi
+node "$ROOT/scripts/check-version-parity.mjs" --binary "$binary"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -71,6 +85,10 @@ if [[ -n "$(git -C "$ROOT" status --porcelain)" ]]; then
     git_dirty=true
 else
     git_dirty=false
+fi
+if [[ "$REQUIRE_CLEAN" -eq 1 ]] && { [[ "$git_head" == "unborn" ]] || [[ "$git_dirty" == "true" ]]; }; then
+    echo "ERROR: --require-clean needs a committed HEAD and a clean tree (head=$git_head dirty=$git_dirty)" >&2
+    exit 1
 fi
 built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 rustc_version="$("$RUSTC" --version)"
@@ -109,19 +127,20 @@ jq -n \
       signature: null
     }' >"$stage/build-receipt.json"
 
-epoch="${SOURCE_DATE_EPOCH:-$(date +%s)}"
+# Prefer the commit time so the same commit produces the same archive bytes.
+if [[ -n "${SOURCE_DATE_EPOCH:-}" ]]; then
+    epoch="$SOURCE_DATE_EPOCH"
+elif [[ "$git_head" != "unborn" ]]; then
+    epoch="$(git -C "$ROOT" show -s --format=%ct "$git_head")"
+else
+    epoch="$(date +%s)"
+fi
 archive="$OUTPUT_DIR/$package_name.tar.gz"
 mkdir -p "$OUTPUT_DIR"
 tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$epoch" \
     -C "$tmp" -czf "$archive" "$package_name"
 archive_sha="$(sha256sum "$archive" | awk '{print $1}')"
 printf '%s  %s\n' "$archive_sha" "$(basename "$archive")" >"$archive.sha256"
-
-extract="$tmp/extracted"
-mkdir -p "$extract"
-tar -xzf "$archive" -C "$extract"
-"$extract/$package_name/bin/codex-reset-status" --version |
-    grep -Fx "codex-reset-status $version" >/dev/null
 
 npm_stage="$tmp/npm"
 mkdir -p "$npm_stage"
@@ -140,10 +159,25 @@ npm pack "$npm_stage/codex-reset-status" \
 
 launcher_tgz="$OUTPUT_DIR/npm/codex-reset-status-$version.tgz"
 platform_tgz="$OUTPUT_DIR/npm/codex-reset-status-linux-x64-$version.tgz"
+bash "$ROOT/scripts/verify-artifacts.sh" \
+    --archive "$archive" \
+    --launcher-tgz "$launcher_tgz" \
+    --platform-tgz "$platform_tgz" \
+    --version "$version"
 bash "$ROOT/scripts/npm-local-verify.sh" "$launcher_tgz" "$platform_tgz" "$version"
+
+if [[ "$REQUIRE_CLEAN" -eq 1 ]]; then
+    # The snapshot must still be the approved one after every build and smoke.
+    if [[ "$(git -C "$ROOT" rev-parse HEAD)" != "$git_head" ]] ||
+        [[ -n "$(git -C "$ROOT" status --porcelain)" ]]; then
+        echo "ERROR: the working tree changed during packaging; artifacts are not tied to $git_head" >&2
+        exit 1
+    fi
+fi
 
 launcher_sha="$(sha256sum "$launcher_tgz" | awk '{print $1}')"
 platform_sha="$(sha256sum "$platform_tgz" | awk '{print $1}')"
+build_receipt_sha="$(sha256sum "$stage/build-receipt.json" | awk '{print $1}')"
 receipt="$OUTPUT_DIR/codex-reset-status-$version-release-receipt.json"
 jq -n \
     --arg schema "codex-reset-status-release-receipt/v1" \
@@ -152,6 +186,9 @@ jq -n \
     --arg gitHead "$git_head" \
     --argjson gitDirty "$git_dirty" \
     --arg builtAt "$built_at" \
+    --arg binarySha256 "$binary_sha" \
+    --arg buildReceiptSha256 "$build_receipt_sha" \
+    --argjson sourceDateEpoch "$epoch" \
     --arg archivePath "$(basename "$archive")" \
     --arg archiveSha256 "$archive_sha" \
     --arg launcherPath "npm/$(basename "$launcher_tgz")" \
@@ -164,19 +201,29 @@ jq -n \
       target: $target,
       git: {head: $gitHead, dirty: $gitDirty},
       builtAt: $builtAt,
+      sourceDateEpoch: $sourceDateEpoch,
+      binarySha256: $binarySha256,
+      buildReceiptSha256: $buildReceiptSha256,
       artifacts: [
         {path: $archivePath, sha256: $archiveSha256},
         {path: $launcherPath, sha256: $launcherSha256},
         {path: $platformPath, sha256: $platformSha256}
       ],
       smoke: [
+        {name: "version-parity", status: "passed"},
         {name: "staged-version", status: "passed"},
+        {name: "archive-contents", status: "passed"},
         {name: "archive-version", status: "passed"},
+        {name: "npm-tarball-contents", status: "passed"},
         {name: "npm-relocated", status: "passed"},
-        {name: "npm-missing-platform", status: "passed"}
+        {name: "npm-missing-platform", status: "passed"},
+        {name: "npm-optional-dependency-resolution", status: "passed"}
       ],
       signature: null
     }' >"$receipt"
+
+node "$ROOT/scripts/check-version-parity.mjs" --receipt "$receipt" >/dev/null ||
+    echo "WARNING: receipt is not publishable yet (see errors above)" >&2
 
 echo "Release archive: $archive"
 echo "Release checksum: $archive.sha256"

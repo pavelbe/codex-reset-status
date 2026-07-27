@@ -180,6 +180,17 @@ mod tests {
     }
 
     #[test]
+    fn rejects_timeouts_outside_the_documented_range() {
+        for value in ["0", "121", "abc", "-1", ""] {
+            let error = parse_from(["--timeout".to_owned(), value.to_owned()])
+                .err()
+                .unwrap_or_else(|| panic!("--timeout {value} must be rejected"));
+            assert_eq!(error.kind.exit_code(), 2);
+        }
+        assert!(parse_from(["--timeout".to_owned(), "120".to_owned()]).is_ok());
+    }
+
+    #[test]
     fn loopback_parser_rejects_userinfo_and_suffix_hosts() {
         assert!(is_loopback_endpoint("http://127.0.0.1:3000/test"));
         assert!(is_loopback_endpoint("http://[::1]:3000/test"));
