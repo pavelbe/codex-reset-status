@@ -12,9 +12,9 @@ Heavy gates are serialized through an optional wrapper (`HEAVY_LOCK`), so prefer
 the Makefile over raw `cargo`:
 
 ```bash
-HEAVY_LOCK=/home/pavelbe/.claude/bin/heavy-lock.sh make check   # test + fmt + clippy + build + shell guards + node test
-HEAVY_LOCK=... make test | make fmt | make clippy | make build  # individual gates, run one at a time
-HEAVY_LOCK=... make package-local                               # scripts/package-release.sh --output-dir dist
+HEAVY_LOCK="$HOME/.claude/bin/heavy-lock.sh" make check          # test + fmt + clippy + build + shell guards + node test
+HEAVY_LOCK=... make test | make fmt | make clippy | make build   # individual gates, run one at a time
+HEAVY_LOCK=... make package-local                                # scripts/package-release.sh --output-dir dist
 make clean                                                      # cargo clean + rm -rf dist
 bash -n scripts/*.sh                                            # shell syntax gate
 ```

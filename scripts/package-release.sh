@@ -57,6 +57,13 @@ if [[ "$target" != "x86_64-unknown-linux-gnu" ]]; then
     exit 1
 fi
 
+# Keep build-machine paths out of the shipped binary. Panic locations from
+# dependencies otherwise embed the packager's home directory and user name.
+# `trim-paths` is not stable in Cargo 1.96, so remap explicitly (longest prefix
+# first). verify-artifacts.sh fails the release if any path survives.
+cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=$cargo_home=/cargo --remap-path-prefix=$ROOT=/src --remap-path-prefix=$HOME=/build"
+
 "$CARGO" build --release --locked --manifest-path "$ROOT/Cargo.toml"
 
 binary="$ROOT/target/release/codex-reset-status"

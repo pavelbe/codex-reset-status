@@ -22,6 +22,13 @@ The receipt records which commit, toolchain and bytes were built on the current
 machine. It does not prove absence of defects, authorship or a cryptographic
 signature. The initial receipt has `"signature": null`.
 
+Release packaging builds with `--remap-path-prefix` for the Cargo home, the
+repository root and the packager's home directory, because dependency panic
+locations otherwise embed build-machine paths and the packager's user name in
+the shipped binary. `scripts/verify-artifacts.sh` fails the release if any such
+path survives. Ordinary `cargo build` / `make check` builds do not remap, so a
+local development binary is not byte-identical to a released one.
+
 The published binary links against glibc (highest required symbol version
 `GLIBC_2.34`, needing `libc.so.6` and `libgcc_s.so.1`). The platform package
 declares `os`, `cpu` and `libc: ["glibc"]`, and the launcher reports a musl host

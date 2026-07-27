@@ -103,6 +103,13 @@ check_tree "$tmp/archive/$package_name" "release archive" \
     "f 644 README.md"
 [[ -x "$tmp/archive/$package_name/bin/codex-reset-status" ]] ||
     fail "extracted binary is not executable"
+# The published binary must not carry build-machine paths or user names.
+if grep -aoE '(/home/[[:alnum:]._-]+|/Users/[[:alnum:]._-]+|/root/)' \
+    "$tmp/archive/$package_name/bin/codex-reset-status" | sort -u | head -5 | grep -q .; then
+    grep -aoE '(/home/[[:alnum:]._-]+|/Users/[[:alnum:]._-]+|/root/)' \
+        "$tmp/archive/$package_name/bin/codex-reset-status" | sort -u | head -5 >&2
+    fail "binary embeds build-machine paths (see above); RUSTFLAGS remapping is missing"
+fi
 "$tmp/archive/$package_name/bin/codex-reset-status" --version |
     grep -Fxq "codex-reset-status $version" ||
     fail "extracted binary reports the wrong version"

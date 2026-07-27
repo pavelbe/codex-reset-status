@@ -22,4 +22,7 @@
   silently showing UTC as if it were local time.
 - Text output states the deadline for the soonest-expiring reset; JSON adds
   `checkedAtLocal`, `timeZone` and `nextExpirySeconds`.
+- Release builds remap build paths, so the shipped binary no longer embeds the
+  packager's home directory or user name; packaging fails if any such path
+  survives.
 - No GitHub Actions or external publication.
