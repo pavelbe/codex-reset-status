@@ -17,6 +17,9 @@ struct JsonOutput<'a> {
     tool: Tool,
     source: &'static str,
     checked_at: String,
+    checked_at_local: &'a str,
+    time_zone: &'a str,
+    next_expiry_seconds: Option<i64>,
     available_count: u64,
     total_earned_count: Option<u64>,
     credits: &'a [Credit],
@@ -32,6 +35,9 @@ pub fn json(summary: &Summary) -> Result<String, serde_json::Error> {
         },
         source: summary.source,
         checked_at: summary.checked_at.to_string(),
+        checked_at_local: &summary.checked_at_local,
+        time_zone: &summary.time_zone,
+        next_expiry_seconds: summary.next_expiry_seconds(),
         available_count: summary.available_count,
         total_earned_count: summary.total_earned_count,
         credits: &summary.credits,
@@ -55,13 +61,24 @@ pub fn text(summary: &Summary) -> String {
     if let Some(total) = summary.total_earned_count {
         lines.push(format!("Total earned: {total}"));
     }
-    lines.push(format!("Checked: {}", timefmt::local(summary.checked_at)));
+    if let Some(seconds) = summary.next_expiry_seconds() {
+        lines.push(format!(
+            "Use the first one within: {}",
+            timefmt::time_left(seconds)
+        ));
+    }
+    lines.push(format!(
+        "Checked: {} ({})",
+        summary.checked_at_local, summary.time_zone
+    ));
     lines.push(String::new());
 
     if summary.credits.is_empty() {
         lines.push("No reset credits found.".to_owned());
     } else {
-        let headers = ["#", "Status", "Type", "Expires (local)", "Time left"];
+        // The zone is stated once in the "Checked" line, so the header stays
+        // correct for both local and --utc output.
+        let headers = ["#", "Status", "Type", "Use before", "Time left"];
         let rows: Vec<Vec<String>> = summary
             .credits
             .iter()

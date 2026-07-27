@@ -1,4 +1,5 @@
 use jiff::Timestamp;
+use jiff::tz::TimeZone;
 use serde::Serialize;
 use serde_json::{Map, Value};
 
@@ -31,13 +32,32 @@ pub struct Credit {
 pub struct Summary {
     pub source: &'static str,
     pub checked_at: Timestamp,
+    pub checked_at_local: String,
+    pub time_zone: String,
     pub available_count: u64,
     pub total_earned_count: Option<u64>,
     pub credits: Vec<Credit>,
     pub warnings: Vec<String>,
 }
 
-pub fn parse(payload: &Value, source: &'static str, now: Timestamp) -> Result<Summary, CliError> {
+impl Summary {
+    /// Seconds until the first credit expires, so callers can show the deadline
+    /// that matters instead of scanning the table.
+    pub fn next_expiry_seconds(&self) -> Option<i64> {
+        self.credits
+            .iter()
+            .filter_map(|credit| credit.seconds_left)
+            .filter(|seconds| *seconds > 0)
+            .min()
+    }
+}
+
+pub fn parse(
+    payload: &Value,
+    source: &'static str,
+    now: Timestamp,
+    zone: &TimeZone,
+) -> Result<Summary, CliError> {
     let root = payload.as_object().ok_or_else(|| {
         CliError::new(
             ErrorKind::Response,
@@ -81,7 +101,7 @@ pub fn parse(payload: &Value, source: &'static str, now: Timestamp) -> Result<Su
             status: string_field(object, "status"),
             reset_type: string_field(object, "reset_type"),
             expires_at_utc: expiry.map(|timestamp| timestamp.to_string()),
-            expires_local: expiry.map(timefmt::local),
+            expires_local: expiry.map(|timestamp| timefmt::local(zone, timestamp)),
             seconds_left,
             time_left: seconds_left
                 .map(timefmt::time_left)
@@ -102,6 +122,8 @@ pub fn parse(payload: &Value, source: &'static str, now: Timestamp) -> Result<Su
     Ok(Summary {
         source,
         checked_at: now,
+        checked_at_local: timefmt::local(zone, now),
+        time_zone: timefmt::zone_label(zone),
         available_count,
         total_earned_count,
         credits: parsed,
@@ -157,6 +179,7 @@ fn string_field(object: &Map<String, Value>, key: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use jiff::Timestamp;
+    use jiff::tz::TimeZone;
     use serde_json::json;
 
     use super::parse;
@@ -164,8 +187,13 @@ mod tests {
     #[test]
     fn rejects_missing_credit_shape() {
         let now = Timestamp::UNIX_EPOCH;
-        let error =
-            parse(&json!({"available_count": 0}), "fixture", now).expect_err("must fail closed");
+        let error = parse(
+            &json!({"available_count": 0}),
+            "fixture",
+            now,
+            &TimeZone::UTC,
+        )
+        .expect_err("must fail closed");
         assert_eq!(error.kind.exit_code(), 6);
     }
 
@@ -185,6 +213,7 @@ mod tests {
             }),
             "fixture",
             now,
+            &TimeZone::UTC,
         )
         .unwrap();
         let rendered = serde_json::to_string(&summary.credits).unwrap();

@@ -60,7 +60,11 @@ fn run(config: Config) -> Result<(), CliError> {
             "live",
         )
     };
-    let summary = payload::parse(&value, source, Timestamp::now())?;
+    let (zone, zone_warning) = timefmt::resolve_zone(config.utc);
+    let mut summary = payload::parse(&value, source, Timestamp::now(), &zone)?;
+    if let Some(warning) = zone_warning {
+        summary.warnings.push(warning);
+    }
     if config.json {
         println!(
             "{}",

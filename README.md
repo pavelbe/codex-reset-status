@@ -10,13 +10,16 @@ settings panel.
 Codex Reset Credits
 Available: 2 resets
 Total earned: 3
-Checked: 2026-07-28 00:19 MSK
+Use the first one within: 3d 22h
+Checked: 2026-07-28 00:29 MSK (Europe/Moscow)
 
-#  Status     Type               Expires (local)       Time left
+#  Status     Type               Use before            Time left
 -  ---------  -----------------  --------------------  ---------
 1  available  codex_rate_limits  2026-07-31 23:18 MSK  3d 22h
 2  available  codex_rate_limits  2026-08-12 21:12 MSK  15d 20h
 ```
+
+`Time left` is how long the reset stays usable: after `Use before` it is gone.
 
 This is the same information the ChatGPT interface shows under **Usage limit
 resets**:
@@ -70,6 +73,7 @@ or hide the Rust source in this repository.
 ```text
 codex-reset-status
 codex-reset-status --json
+codex-reset-status --utc
 codex-reset-status --auth-file ~/.codex/auth.json
 codex-reset-status --fixture tests/fixtures/ok.json
 codex-reset-status --timeout 15
@@ -77,6 +81,15 @@ codex-reset-status --timeout 15
 
 `--fixture` performs no network request and is intended for deterministic
 testing and endpoint-shape diagnostics.
+
+### Time zones
+
+Expiry timestamps arrive from the endpoint in UTC. By default they are converted
+to the host time zone — `TZ` if set, otherwise `/etc/localtime` — and the zone is
+named in the `Checked:` line so the output is never ambiguous. `--utc` (or
+`CODEX_RESET_STATUS_UTC=1`) keeps everything in UTC, which is what you want in
+logs and shared output. If the host zone cannot be resolved, the CLI falls back to
+UTC **and says so** in `Warnings:` rather than silently pretending.
 
 For compatibility with the current endpoint, the request sends the
 `originator: Codex Desktop` header used by the working Codex client flow. The
@@ -94,9 +107,11 @@ codex-reset-status --json
 ```
 
 Machine-readable output uses the versioned allowlist schema
-`codex-reset-status/v1` with `tool`, `source`, `checkedAt`, `availableCount`,
-`totalEarnedCount`, `credits[]` and `warnings[]`. It never returns the raw
-endpoint response, so an added upstream field cannot leak into your logs.
+`codex-reset-status/v1` with `tool`, `source`, `checkedAt` (UTC), `checkedAtLocal`,
+`timeZone`, `nextExpirySeconds`, `availableCount`, `totalEarnedCount`, `credits[]`
+and `warnings[]`. Each credit carries both `expiresAtUtc` and `expiresLocal` plus
+`secondsLeft`, `timeLeft` and `expired`. It never returns the raw endpoint
+response, so an added upstream field cannot leak into your logs.
 
 ## How it works
 

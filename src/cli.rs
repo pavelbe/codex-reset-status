@@ -14,6 +14,7 @@ pub enum Action {
 
 pub struct Config {
     pub json: bool,
+    pub utc: bool,
     pub auth_file: Option<PathBuf>,
     pub fixture: Option<PathBuf>,
     pub endpoint: String,
@@ -29,6 +30,7 @@ where
     I: IntoIterator<Item = String>,
 {
     let mut json = false;
+    let mut utc = env::var("CODEX_RESET_STATUS_UTC").as_deref() == Ok("1");
     let mut auth_file = env::var_os("CODEX_RESET_STATUS_AUTH_FILE").map(PathBuf::from);
     let mut fixture = env::var_os("CODEX_RESET_STATUS_FIXTURE").map(PathBuf::from);
     let mut endpoint =
@@ -43,6 +45,7 @@ where
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--json" => json = true,
+            "--utc" => utc = true,
             "--auth-file" => {
                 auth_file = Some(PathBuf::from(require_value(&mut args, "--auth-file")?));
             }
@@ -72,6 +75,7 @@ where
 
     Ok(Action::Run(Config {
         json,
+        utc,
         auth_file,
         fixture,
         endpoint,
@@ -142,6 +146,7 @@ Show available ChatGPT/Codex reset credits and their expiry times.\n\
 \n\
 Options:\n\
   --json              Print codex-reset-status/v1 JSON\n\
+  --utc               Show times in UTC instead of the local system zone\n\
   --auth-file <PATH>  Override the Codex auth.json path\n\
   --fixture <PATH>    Read endpoint JSON from a file; performs no network request\n\
   --endpoint <URL>    Select the built-in endpoint or an opted-in loopback test\n\
@@ -151,6 +156,7 @@ Options:\n\
 \n\
 Environment:\n\
   CODEX_HOME, CODEX_RESET_STATUS_AUTH_FILE, CODEX_RESET_STATUS_FIXTURE,\n\
+  CODEX_RESET_STATUS_UTC, TZ,\n\
   CODEX_RESET_STATUS_ENDPOINT, CODEX_RESET_STATUS_TIMEOUT_SECS,\n\
   HTTPS_PROXY, ALL_PROXY, NO_PROXY\n\
 \n\

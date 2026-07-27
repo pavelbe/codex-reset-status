@@ -284,3 +284,58 @@ fn rejects_a_control_character_account_id_before_any_request() {
         "no request may be sent when the account id is rejected"
     );
 }
+
+#[test]
+fn renders_utc_on_request_and_names_the_zone() {
+    let output = Command::new(binary())
+        .args(["--utc", "--fixture", &fixture("ok.json")])
+        .env("TZ", "Asia/Tokyo")
+        .output()
+        .expect("run binary");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("(UTC)"), "stdout: {stdout}");
+    assert!(!stdout.contains("JST"), "stdout: {stdout}");
+}
+
+#[test]
+fn renders_the_host_zone_by_default() {
+    let output = Command::new(binary())
+        .args(["--fixture", &fixture("ok.json")])
+        .env("TZ", "Asia/Tokyo")
+        .output()
+        .expect("run binary");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("(Asia/Tokyo)"), "stdout: {stdout}");
+    assert!(stdout.contains("JST"), "stdout: {stdout}");
+}
+
+#[test]
+fn warns_instead_of_silently_falling_back_when_the_zone_is_unusable() {
+    let output = Command::new(binary())
+        .args(["--fixture", &fixture("ok.json")])
+        .env("TZ", "Invalid/Zone")
+        .output()
+        .expect("run binary");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("cannot determine the system time zone"),
+        "stdout: {stdout}"
+    );
+    assert!(stdout.contains("(UTC)"), "stdout: {stdout}");
+}
+
+#[test]
+fn reports_the_deadline_for_the_first_expiring_reset() {
+    let output = Command::new(binary())
+        .args(["--json", "--fixture", &fixture("ok.json")])
+        .output()
+        .expect("run binary");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("\"nextExpirySeconds\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"timeZone\""), "stdout: {stdout}");
+    assert!(stdout.contains("\"checkedAtLocal\""), "stdout: {stdout}");
+}

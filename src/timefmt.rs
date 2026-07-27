@@ -43,9 +43,32 @@ fn parse_number(value: f64) -> Option<Timestamp> {
     }
 }
 
-pub fn local(timestamp: Timestamp) -> String {
+/// Resolves the display zone. Without `--utc` this is the host zone from `TZ` or
+/// `/etc/localtime`; when that cannot be resolved the caller gets UTC plus a
+/// warning, so a fallback is never silent.
+pub fn resolve_zone(utc: bool) -> (TimeZone, Option<String>) {
+    if utc {
+        return (TimeZone::UTC, None);
+    }
+    match TimeZone::try_system() {
+        Ok(zone) => (zone, None),
+        Err(error) => (
+            TimeZone::UTC,
+            Some(format!(
+                "cannot determine the system time zone ({error}); times are shown in UTC"
+            )),
+        ),
+    }
+}
+
+/// Human-readable zone label for output, for example `Europe/Moscow` or `UTC`.
+pub fn zone_label(zone: &TimeZone) -> String {
+    zone.iana_name().unwrap_or("UTC").to_owned()
+}
+
+pub fn local(zone: &TimeZone, timestamp: Timestamp) -> String {
     timestamp
-        .to_zoned(TimeZone::system())
+        .to_zoned(zone.clone())
         .strftime("%Y-%m-%d %H:%M %Z")
         .to_string()
 }
@@ -72,7 +95,27 @@ mod tests {
     use jiff::Timestamp;
     use serde_json::json;
 
-    use super::{parse, time_left};
+    use jiff::tz::TimeZone;
+
+    use super::{local, parse, resolve_zone, time_left, zone_label};
+
+    #[test]
+    fn utc_mode_never_consults_the_host_zone() {
+        let (zone, warning) = resolve_zone(true);
+        assert_eq!(zone, TimeZone::UTC);
+        assert_eq!(warning, None);
+        assert_eq!(zone_label(&zone), "UTC");
+        let timestamp: Timestamp = "2026-07-31T20:18:56Z".parse().unwrap();
+        assert_eq!(local(&zone, timestamp), "2026-07-31 20:18 UTC");
+    }
+
+    #[test]
+    fn renders_a_named_zone_in_local_time() {
+        let zone = TimeZone::get("Asia/Tokyo").expect("bundled or system tzdb");
+        assert_eq!(zone_label(&zone), "Asia/Tokyo");
+        let timestamp: Timestamp = "2026-07-31T20:18:56Z".parse().unwrap();
+        assert_eq!(local(&zone, timestamp), "2026-08-01 05:18 JST");
+    }
 
     #[test]
     fn parses_supported_timestamp_shapes() {

@@ -16,4 +16,10 @@
   local registry.
 - `make package-release` refuses an unborn HEAD or a dirty tree and re-checks
   the same commit after every smoke.
+- Times are converted to the host zone (`TZ` or `/etc/localtime`) and the zone is
+  named in the output; `--utc` / `CODEX_RESET_STATUS_UTC=1` renders UTC instead.
+- An unresolvable host time zone now warns and falls back to UTC instead of
+  silently showing UTC as if it were local time.
+- Text output states the deadline for the soonest-expiring reset; JSON adds
+  `checkedAtLocal`, `timeZone` and `nextExpirySeconds`.
 - No GitHub Actions or external publication.

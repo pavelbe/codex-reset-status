@@ -14,7 +14,8 @@ dependency on Python, curl or Node for direct binary users.
 - `auth`: bounded local auth-file reading and tolerant known-field discovery.
 - `http`: one bounded request, no redirects or retries, no raw-body output.
 - `payload`: tolerant known-field extraction with fail-closed root/list shape.
-- `timefmt`: UTC normalization, local display and countdown calculation.
+- `timefmt`: UTC normalization, explicit zone resolution (host zone or `--utc`,
+  with a warning instead of a silent UTC fallback) and countdown calculation.
 - `render`: human output and versioned allowlist JSON.
 
 ## Endpoint
