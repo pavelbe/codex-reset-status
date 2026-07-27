@@ -4,7 +4,7 @@
 have and when each one expires — from the terminal, without opening the ChatGPT
 settings panel.
 
-![Terminal showing codex-reset-status output: 2 available resets with expiry dates and time left](https://raw.githubusercontent.com/pavelbe/codex-reset-status/main/docs/assets/cli-output.png)
+![Terminal showing codex-reset-status output: 2 available resets with expiry dates and time left](https://raw.githubusercontent.com/pavelbe/codex-reset-status/main/docs/assets/cli-output.png?v=2)
 
 ```text
 Codex Reset Credits
@@ -24,7 +24,7 @@ Checked: 2026-07-28 00:29 MSK (Europe/Moscow)
 This is the same information the ChatGPT interface shows under **Usage limit
 resets**:
 
-![ChatGPT UI panel listing two available full resets expiring 7/31 and 8/12](https://raw.githubusercontent.com/pavelbe/codex-reset-status/main/docs/assets/chatgpt-usage-limit-resets.png)
+![ChatGPT UI panel listing two available full resets expiring 7/31 and 8/12](https://raw.githubusercontent.com/pavelbe/codex-reset-status/main/docs/assets/chatgpt-usage-limit-resets.png?v=2)
 
 The CLI is read-only. It reads the existing Codex authentication file, makes one
 request, and prints an allowlisted summary. It never prints the access token or
