@@ -4,16 +4,18 @@
 have and when each one expires — from the terminal, without opening the ChatGPT
 settings panel.
 
+![Terminal showing codex-reset-status output: 2 available resets with expiry dates and time left](https://raw.githubusercontent.com/pavelbe/codex-reset-status/main/docs/assets/cli-output.png)
+
 ```text
 Codex Reset Credits
 Available: 2 resets
 Total earned: 3
-Checked: 2026-07-28 00:11 MSK
+Checked: 2026-07-28 00:19 MSK
 
 #  Status     Type               Expires (local)       Time left
 -  ---------  -----------------  --------------------  ---------
-1  available  codex_rate_limits  2026-07-31 23:18 MSK  3d 23h
-2  available  codex_rate_limits  2026-08-12 21:12 MSK  15d 21h
+1  available  codex_rate_limits  2026-07-31 23:18 MSK  3d 22h
+2  available  codex_rate_limits  2026-08-12 21:12 MSK  15d 20h
 ```
 
 This is the same information the ChatGPT interface shows under **Usage limit
