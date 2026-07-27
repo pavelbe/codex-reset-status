@@ -35,3 +35,31 @@ declares `os`, `cpu` and `libc: ["glibc"]`, and the launcher reports a musl host
 as unsupported instead of failing obscurely.
 
 No GitHub-hosted workflow is part of this trust boundary.
+
+## Published 0.1.0 (2026-07-28)
+
+Built and packaged from commit `a147fc5408983dbc7205d45b75ed4cbac20bc4e3` with a
+clean tree; binary SHA-256
+`b9d2e197a75324b833bcc2e71be5aa7bd5bd32e5a8fbb972bf31efa122b21c75`.
+
+| Artifact | Local SHA-256 | Registry shasum |
+| --- | --- | --- |
+| `codex-reset-status-linux-x64-0.1.0.tgz` | `1e9eb14f2ab2ce7b6883fa0434c6219b3e7a491448475fc67c79a683fcf3dd0d` | `f1f13e273ddd2d957499aa4f0981213922680887` |
+| `codex-reset-status-0.1.0.tgz` | `e5179e0adb693ac1b17c4da0cb7c4264445890a6a30ff2e4c9c70e446be8138e` | `0b3c3c0c09124efd688a4d994e0dd6eba6aa1395` |
+| `codex-reset-status-0.1.0-linux-x86_64.tar.gz` | `3119a28ab2c205c85f3be68322aeb1a80bb5cae0c6191bb59cc29b28fff2da43` | not published |
+
+Registry integrity values:
+
+- `codex-reset-status-linux-x64@0.1.0` —
+  `sha512-aQEJXC3FGAF9PSvNxO3oNEWPt5yz6ALg/Q7aa+jg6Fy1kVJLsPpqJjQGYPUnmkr6zdAZjP2s2KIY+YRA1ICTEg==`
+- `codex-reset-status@0.1.0` —
+  `sha512-1poqrC/PM/1DLJF8seuS2sxLmvTA2lX/b8ETEcrxYbqMYINRnD61IKSgIwJnd3XxUx8shTqtDprGDacuetLbSw==`
+
+The platform package was published first, then the launcher, from exactly those
+tarballs with no rebuild in between. Both carry `dist-tags.latest = 0.1.0`, five
+files, no `scripts` and no runtime dependencies. A launcher-only install from the
+public registry resolved `codex-reset-status-linux-x64@0.1.0`, extracted the
+binary with mode `755` and the same SHA-256 as the receipt records, and the
+installed CLI ran.
+
+The `.tar.gz` archive is a local artifact only; no GitHub Release exists.

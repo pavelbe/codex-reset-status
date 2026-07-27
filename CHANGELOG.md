@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 — 2026-07-28
+
+Published to npm as `codex-reset-status` (launcher) and
+`codex-reset-status-linux-x64` (Linux x86_64 glibc binary), tag `latest`.
+crates.io and GitHub Releases are not published.
+
 
 - Initial Rust CLI, versioned JSON output and deterministic fixture tests.
 - Local Linux x86_64 (glibc) archive and npm launcher/platform packages.

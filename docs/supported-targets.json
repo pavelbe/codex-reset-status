@@ -13,6 +13,7 @@
         "relocated archive smoke",
         "local npm tarball smoke",
         "launcher-only optionalDependencies resolution against a fixture registry",
+        "launcher-only install of published 0.1.0 from https://registry.npmjs.org resolved the platform package, mode 755, matching binary sha256",
         "objdump -T highest required symbol version: GLIBC_2.34"
       ]
     },

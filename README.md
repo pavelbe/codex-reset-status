@@ -37,12 +37,18 @@ passes it to a subprocess.
 
 ## Install
 
-Once the packages are published, the launcher installs the prebuilt binary
-through `optionalDependencies` — no install scripts and no runtime downloads:
+The launcher installs the prebuilt binary through `optionalDependencies` — no
+install scripts and no runtime downloads:
 
 ```bash
 npm install -g codex-reset-status
 codex-reset-status
+```
+
+Or run it once without installing:
+
+```bash
+npx codex-reset-status
 ```
 
 Or build from source (always available, MIT):
@@ -59,10 +65,12 @@ By default the CLI reads `$CODEX_HOME/auth.json`, falling back to
 
 ## Current Status
 
-Version `0.1.0` is in development. Linux x86_64 with glibc (including WSL) is the
-only locally verified target; the binary requires `GLIBC_2.34` or newer and musl
-hosts are reported as unsupported.
-npm and crates.io packages are not published yet.
+Version `0.1.0` is published on npm as
+[`codex-reset-status`](https://www.npmjs.com/package/codex-reset-status) plus the
+platform package `codex-reset-status-linux-x64`. Linux x86_64 with glibc
+(including WSL) is the only verified target; the binary requires `GLIBC_2.34` or
+newer and musl hosts are reported as unsupported.
+The crates.io package is not published yet.
 
 The complete Rust source is public under the MIT license. The npm packages
 contain a small launcher and the compiled platform binary; they do not duplicate

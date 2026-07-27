@@ -12,7 +12,7 @@ required=(
     "independent, unofficial"
     "not affiliated with or"
     "undocumented ChatGPT backend endpoint"
-    "npm and crates.io packages are not published yet"
+    "The crates.io package is not published yet"
     "does not use GitHub Actions"
 )
 
